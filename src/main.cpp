@@ -10,13 +10,16 @@
 
 
 #define USE_SOFTWARESERIAL 1   ///< Set to 1 to use SoftwareSerial library, 0 for native serial port
-
 #include <MD_YX5300.h>
 #include <MD_cmdProcessor.h>
-
-
 #include <SoftwareSerial.h>
 
+
+#define Console   Serial   // command processor input/output stream
+
+
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
+#define CMD(s) { Console.print(F("\n>")); Console.print(F(s)); Console.print(F(" ")); }
 // Connections for serial interface to the YX5300 module
 const uint8_t MP3_RX = 0;    // "D3" connect to TX of MP3 Player module
 const uint8_t MP3_TX = 2;    // "D4" connect to RX of MP3 Player module
@@ -25,11 +28,7 @@ const uint8_t MP3_TX = 2;    // "D4" connect to RX of MP3 Player module
 SoftwareSerial  softserial(MP3_RX, MP3_TX);  // MP3 player serial stream for comms
 //SoftwareSerial  softserial(0, 2);  // MP3 player serial stream for comms
 
-#define Console   Serial   // command processor input/output stream
 
-
-#define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
-#define CMD(s) { Console.print(F("\n>")); Console.print(F(s)); Console.print(F(" ")); }
 
 // Define YX5300 global variables
 MD_YX5300 mp3(softserial);
