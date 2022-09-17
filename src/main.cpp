@@ -136,8 +136,8 @@ void cbResponse(const MD_YX5300::cbData *status)
     default: Console.print(F("STS_??? 0x")); Console.print(status->code, HEX); break;
   }
 
-  Console.print(F(", 0x"));
-  Console.print(status->data, HEX);
+  //Console.print(F(", 0x"));
+  //Console.print(status->data, HEX);
 }
 
 void setCallbackMode(bool b)
@@ -194,9 +194,8 @@ int ringUpdateDelayCounter = 0;
 int ringUpdateDelayTrigger = 200;   // Update the display once evry 20 times through loop
 void loop()
 {
-  //CP.run();
-  Console.print (" >");
-  Console.println (ringUpdateDelayCounter);
+
+  //Console.println (ringUpdateDelayCounter);
   ringUpdateDelayCounter++;
   if (ringUpdateDelayCounter >= ringUpdateDelayTrigger) {
     ringUpdateDelayCounter = 0;
