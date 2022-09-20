@@ -40,10 +40,12 @@ int oldMinutes = -1;
 int oldSeconds = -1;
 
 //  Test value for chime loop
-int Hours = 4;
+int Hours = 12;
 int Minutes = 30;
 int Seconds = -1;
 
+//  We will check that there are readable audio files
+int filesOnDisk = 0;  
 
 // RGB strip has connected to NeoPixelPin.  There are other, more real-time modes, but we're saving our interrupts and timers for now.
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NumberOfNeoPixels, NeoPixelPin, NEO_GRB + NEO_KHZ800);
@@ -57,7 +59,13 @@ bool bUseSynch = false;   // not synchronous
 
 // MP3 module indicates when a track is done by sending a token over serial.  We'll watch for that on a serial interrupt.  Assume at start nothing is playi9ng, because
 // we haven't yet asked for a play
-bool isTrackFinished = true;
+bool isTrackFinished = true; // When we start to play a track, we'll make it false.  A response/interrupt from the MP3 module will make it true again 
+int numberOfTracks = 0;  //  We'll read to see how many tracks are on the SD card
+bool trackStatusChange = false;
+bool fileCountStatusChange = false;
+
+
+char outputString[20];
 
 
 void readRTC() {
@@ -106,11 +114,19 @@ void cbResponse(const MD_YX5300::cbData *status)
 // Used to process device responses either as a library callback function
 // or called locally when not in callback mode.
 {
+ 
+  Console.print ("Callback:");
+
+/*
   if (bUseSynch)
     Console.print(F("\nSync Status: "));
   else
     Console.print(F("\nCback status: "));
+*/
 
+
+//Console.print ("Callback data:");
+//Console.println(status->data);
   switch (status->code)
   {
     case MD_YX5300::STS_OK:         Console.print(F("STS_OK"));         break;
@@ -123,21 +139,29 @@ void cbResponse(const MD_YX5300::cbData *status)
     case MD_YX5300::STS_ACK_OK:     Console.print(F("STS_ACK_OK"));     break;
     case MD_YX5300::STS_FILE_END:   {
         Console.print(F("STS_FILE_END"));
-        isTrackFinished = true;  // Tom modification to say track is finished, perhaps play next chime if needed
+        trackStatusChange = true;
+        isTrackFinished = true;  //  global to say track is finished, perhaps play next track or finish
       } break;
     case MD_YX5300::STS_INIT:       Console.print(F("STS_INIT"));       break;
     case MD_YX5300::STS_STATUS:     Console.print(F("STS_STATUS"));     break;
     case MD_YX5300::STS_EQUALIZER:  Console.print(F("STS_EQUALIZER"));  break;
     case MD_YX5300::STS_VOLUME:     Console.print(F("STS_VOLUME"));     break;
-    case MD_YX5300::STS_TOT_FILES:  Console.print(F("STS_TOT_FILES"));  break;
+
+    case MD_YX5300::STS_TOT_FILES: {  
+      //Console.print(F("STS_TOT_FILES: "));  
+      //Console.print(status->data);
+      numberOfTracks = status->data;
+      fileCountStatusChange = true;
+    } break;
     case MD_YX5300::STS_PLAYING:    Console.print(F("STS_PLAYING"));    break;
     case MD_YX5300::STS_FLDR_FILES: Console.print(F("STS_FLDR_FILES")); break;
     case MD_YX5300::STS_TOT_FLDR:   Console.print(F("STS_TOT_FLDR"));   break;
     default: Console.print(F("STS_??? 0x")); Console.print(status->code, HEX); break;
   }
+  Console.print("\n");
 
-  //Console.print(F(", 0x"));
-  //Console.print(status->data, HEX);
+ // Console.print(F(", 0x"));
+ // Console.print(status->data, HEX);
 }
 
 void setCallbackMode(bool b)
@@ -156,80 +180,96 @@ void setSynchMode(bool b)
   mp3.setSynchronous(b);
 }
 
-
-
 char * getNum(char *cp, uint32_t &v, uint8_t base = 10)
 {
   char* rp;
 
   v = strtoul(cp, &rp, base);
-
   return (rp);
 }
 
-
-void setup()
-{
-  // YX5300 Serial interface
-  softserial.begin(MD_YX5300::SERIAL_BPS);
-  mp3.begin();
-  setCallbackMode(bUseCallback);
-  setSynchMode(bUseSynch);
-
-
-  // Console interface from the IDE
-  Console.begin(ConsoleBaudRate);
-
-
+//  This would be different based on different displays, e.g. Neopixel, 7-segment, etc
+void initClockDisplay() {
   pixels.begin(); //  Initializes the NeoPixel library.
   turnPixelsSolid(10,0,10);
   pixels.show();
 }
 
 
+void initMp3Module() {
+  // YX5300 Serial interface
+  softserial.begin(MD_YX5300::SERIAL_BPS);
+  mp3.begin();
+  setCallbackMode(bUseCallback);
+  setSynchMode(bUseSynch);
+}
+
+
+void setup()
+{
+  Console.begin(ConsoleBaudRate);
+  initMp3Module();
+  initClockDisplay();
+  // Send a request to check if there are files on the SD card
+  // Result will be in filesOnDisk
+  mp3.queryFilesCount();
+  delay(1000);
+}
 
 
 
-int ringUpdateDelayCounter = 0;
-int ringUpdateDelayTrigger = 200;   // Update the display once evry 20 times through loop
+
+
 void loop()
 {
-
-  //Console.println (ringUpdateDelayCounter);
-  ringUpdateDelayCounter++;
-  if (ringUpdateDelayCounter >= ringUpdateDelayTrigger) {
-    ringUpdateDelayCounter = 0;
-    //Console.print (" >");
-    //Console.println (ringUpdateDelayCounter);
-    showTimeOnNeopixelRing();
-  }
-
-  while (chimeCounter < Hours) {  //used to be TimesToChime
-
-    Console.print ("\b\b-=");
-    Console.println (isTrackFinished);
-    //delay(1000);
-    if (isTrackFinished == true) {
-      turnPixelsSolid(0, 0, 0);
-      Console.print ("Beginning chime #");
-
-      setColor(chimeCounter,20,20,20,100); //red
-
-      Console.print (chimeCounter);
-      Console.print ("\n");
-      Console.print ("isTrackFinished is TRUE, so STARTING A PLAY.  First setting isTrackFinished to FALSE\n");
-      isTrackFinished = false;
-      delay (300);
-      turnPixelsSolid(0, 0, 0);
-      mp3.playSpecific(1, 1);
-      //delay(100);
-      chimeCounter++;
-    }
+  // In the loop we'll be:
+  //  1.  Checking for variables changed by callbacks.
+  //      these variables are:
+  //         filesOnDisk - Returned after query to list the number of files
+  //         isTrackFinished -  Did the MP3 module complete playing a track
+  //         FUTURE:  When web message is received, e.g. from sensor, play appropriate track
+  //  2.  Periodically updating the RTC
+  //  3.  Checking if it's time to chime, e.g. XX:00 on the clock
+  //  4.  Periodically update any neopixel/7-segment or other display
 
 
-    delay (100);
-    mp3.check();
-  }
-  //turnPixelsSolid(0, 0, 0);
-  //showTimeOnNeopixelRing();
+
+// (Asynchronously) Check for status changes in the MP3 module.  Could be Track Finished, File Count, etc
+   
+//Console.print (".");
+mp3.check();
+
+
+if (fileCountStatusChange == true) {
+  Console.print ("Number of tracks:");
+  Console.print (numberOfTracks);
+  Console.print("\n");
+  fileCountStatusChange = false;
+  delay (1000);
 }
+
+// Can only be one type of response at a time.
+
+else if ((trackStatusChange == true) && (isTrackFinished == true)) {  // Set to true initially, and on completion of each track
+      //Console.print ("isTrackFinished:True\n");
+  
+   // Do we need to play additional chimes?
+      if (chimeCounter < Hours) {
+        chimeCounter++;
+        Console.print("CHIME ");
+        Console.println(chimeCounter);
+        Console.print("\n");
+
+        mp3.playSpecific(1, 1);
+        isTrackFinished = false;
+        delay (200);
+
+    }
+    delay (100);
+  }
+}
+
+
+
+
+
