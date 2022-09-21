@@ -250,7 +250,7 @@ if (fileCountStatusChange == true) {
   Console.print (numberOfTracks);
   Console.print("\n");
   fileCountStatusChange = false;
-  delay (1000);
+  delay (500);
 }
 
 // Can only be one type of response at a time.
@@ -264,10 +264,10 @@ else if (isTrackFinished == true) {  // Set to true initially, and on completion
         Console.print("CHIME ");
         Console.println(chimeCounter);
         Console.print("\n");
-delay (200);
+//delay (200);
         mp3.playSpecific(1, 1);
         isTrackFinished = false;
-        delay (200);
+        //delay (200);
 
     }
     delay (100);
