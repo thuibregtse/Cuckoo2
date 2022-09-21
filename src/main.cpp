@@ -63,6 +63,7 @@ bool isTrackFinished = true; // When we start to play a track, we'll make it fal
 int numberOfTracks = 0;  //  We'll read to see how many tracks are on the SD card
 bool trackStatusChange = false;
 bool fileCountStatusChange = false;
+bool trackError = false;
 
 
 char outputString[20];
@@ -135,8 +136,12 @@ void cbResponse(const MD_YX5300::cbData *status)
     case MD_YX5300::STS_CHECKSUM:   Console.print(F("STS_CHECKSUM"));    break;
     case MD_YX5300::STS_TF_INSERT:  Console.print(F("STS_TF_INSERT"));  break;
     case MD_YX5300::STS_TF_REMOVE:  Console.print(F("STS_TF_REMOVE"));  break;
-    case MD_YX5300::STS_ERR_FILE:   Console.print(F("STS_ERR_FILE"));   break;
-    case MD_YX5300::STS_ACK_OK:     Console.print(F("STS_ACK_OK"));     break;
+    case MD_YX5300::STS_ERR_FILE: {
+      // Seems to happen randomly.  Retry the track after a delay  
+      trackError = true;
+      Console.print(F("STS_ERR_FILE"));   break;
+    } break;
+    case MD_YX5300::STS_ACK_OK:       Console.print(F("STS_ACK_OK")); break;
     case MD_YX5300::STS_FILE_END:   {
         Console.print(F("STS_FILE_END"));
         trackStatusChange = true;
@@ -239,7 +244,7 @@ void loop()
 //Console.print (".");
 mp3.check();
 
-
+// Make sure we have a track to play
 if (fileCountStatusChange == true) {
   Console.print ("Number of tracks:");
   Console.print (numberOfTracks);
@@ -250,7 +255,7 @@ if (fileCountStatusChange == true) {
 
 // Can only be one type of response at a time.
 
-else if ((trackStatusChange == true) && (isTrackFinished == true)) {  // Set to true initially, and on completion of each track
+else if (isTrackFinished == true) {  // Set to true initially, and on completion of each track
       //Console.print ("isTrackFinished:True\n");
   
    // Do we need to play additional chimes?
@@ -259,13 +264,21 @@ else if ((trackStatusChange == true) && (isTrackFinished == true)) {  // Set to 
         Console.print("CHIME ");
         Console.println(chimeCounter);
         Console.print("\n");
-
+delay (200);
         mp3.playSpecific(1, 1);
         isTrackFinished = false;
         delay (200);
 
     }
     delay (100);
+  }
+  else if (trackError == true) {
+    // Whoops.  Had a problem playing a track.  Retry after a delay
+      Console.println("OMG.  I hit a track error.  Retrying....");
+      trackError = false;
+      mp3.playSpecific(1, 1);
+      delay (500);
+
   }
 }
 
